@@ -9,8 +9,10 @@ const defaultOptions = {
     aaColor: [255, 255, 0], // color of anti-aliased pixels in diff output
     diffColor: [255, 0, 0], // color of different pixels in diff output
     diffColorAlt: null,     // whether to detect dark on light differences between img1 and img2 and set an alternative color to differentiate between the two
-    diffMask: false         // draw the diff over a transparent background (a mask)
+    diffMask: 'grayscale'   // draw the diff over a mask
 };
+
+const allowedDiffMask = ['original', 'transparent', 'grayscale'];
 
 function pixelmatch(img1, img2, output, width, height, options) {
 
@@ -24,6 +26,12 @@ function pixelmatch(img1, img2, output, width, height, options) {
 
     options = Object.assign({}, defaultOptions, options);
 
+    // Backward Compatibility
+    if (options.diffMask && !allowedDiffMask.includes(options.diffMask)) options.diffMask = 'transparent';
+    if (!options.diffMask) options.diffMask = 'grayscale';
+    // // OR Raise if to be a breaking change
+    // if (!allowedDiffMask.includes(options.diffMask)) throw new Error(`options.diffMask: ${allowedDiffMask.join(', ')} expected.`);
+
     // check if images are identical
     const len = width * height;
     const a32 = new Uint32Array(img1.buffer, img1.byteOffset, len);
@@ -34,8 +42,13 @@ function pixelmatch(img1, img2, output, width, height, options) {
         if (a32[i] !== b32[i]) { identical = false; break; }
     }
     if (identical) { // fast path if identical
-        if (output && !options.diffMask) {
-            for (let i = 0; i < len; i++) drawGrayPixel(img1, 4 * i, options.alpha, output);
+        if (output) {
+            if (options.diffMask === 'original') {
+                for (let i = 0; i < len; i++) drawPixel(output, i * 4, ...(img1.slice(i * 4, (i * 4) + 3)), options.alpha * 255);
+            }
+            if (options.diffMask === 'grayscale') {
+                for (let i = 0; i < len; i++) drawGrayPixel(img1, i * 4, options.alpha, output);
+            }
         }
         return 0;
     }
@@ -60,8 +73,8 @@ function pixelmatch(img1, img2, output, width, height, options) {
                 if (!options.includeAA && (antialiased(img1, x, y, width, height, img2) ||
                                            antialiased(img2, x, y, width, height, img1))) {
                     // one of the pixels is anti-aliasing; draw as yellow and do not count as difference
-                    // note that we do not include such pixels in a mask
-                    if (output && !options.diffMask) drawPixel(output, pos, ...options.aaColor);
+                    // note that we do not include such pixels in a transparent mask
+                    if (output && options.diffMask !== 'transparent') drawPixel(output, pos, ...options.aaColor);
 
                 } else {
                     // found substantial difference not caused by anti-aliasing; draw it as such
@@ -72,8 +85,9 @@ function pixelmatch(img1, img2, output, width, height, options) {
                 }
 
             } else if (output) {
-                // pixels are similar; draw background as grayscale image blended with white
-                if (!options.diffMask) drawGrayPixel(img1, pos, options.alpha, output);
+                // pixels are similar; draw background as depending on mask specified
+                if (options.diffMask === 'original') drawPixel(output, pos, ...(img1.slice(pos, pos + 3)), options.alpha * 255);
+                if (options.diffMask === 'grayscale') drawGrayPixel(img1, pos, options.alpha, output);
             }
         }
     }
@@ -220,11 +234,11 @@ function blend(c, a) {
     return 255 + (c - 255) * a;
 }
 
-function drawPixel(output, pos, r, g, b) {
+function drawPixel(output, pos, r, g, b, a = 255) {
     output[pos + 0] = r;
     output[pos + 1] = g;
     output[pos + 2] = b;
-    output[pos + 3] = 255;
+    output[pos + 3] = a;
 }
 
 function drawGrayPixel(img, i, alpha, output) {

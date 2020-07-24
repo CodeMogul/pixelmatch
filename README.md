@@ -50,7 +50,7 @@ Implements ideas from the following papers:
 - `aaColor` — The color of anti-aliased pixels in the diff output in `[R, G, B]` format. `[255, 255, 0]` by default.
 - `diffColor` — The color of differing pixels in the diff output in `[R, G, B]` format. `[255, 0, 0]` by default.
 - `diffColorAlt` — An alternative color to use for dark on light differences to differentiate between "added" and "removed" parts. If not provided, all differing pixels use the color specified by `diffColor`. `null` by default.
-- `diffMask` — Draw the diff over a transparent background (a mask), rather than over the original image. Will not draw anti-aliased pixels (if detected).
+- `diffMask` — Draw the diff over one of the following `original` (orignal image), `transparent` (transparent background), `grayscale`  (grascaled version of original image). Will not draw anti-aliased pixels (if detected).
 
 Compares two images, writes the output diff and returns the number of mismatched pixels.
 
